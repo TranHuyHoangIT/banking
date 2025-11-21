@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Máy tính lỗ do rút trước hạn</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+  /* Minimal nice UI */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+  :root{
+    --bg:#0b1220; --panel:#0f1724; --muted:#9aa6bd; --accent:#60d69c; --card:#0b1b2b;
+    --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:#e6eef6;
+       background: linear-gradient(180deg,#03111a 0%, #071828 50%, #071827 100%);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1100px;margin:24px auto;padding:18px;}
+  header{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+  h1{font-size:20px;margin:0}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .card{background:linear-gradient(180deg,var(--glass), rgba(255,255,255,0.02));border-radius:12px;padding:14px;box-shadow:0 8px 30px rgba(2,8,23,0.6)}
+  .col-4{grid-column:span 4}
+  .col-3{grid-column:span 3}
+  .col-6{grid-column:span 6}
+  .col-8{grid-column:span 8}
+  .col-12{grid-column:span 12}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type="number"], input[type="date"], select, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef6;font-size:14px}
+  textarea{min-height:120px;font-family:monospace}
+  button{background:linear-gradient(90deg,var(--accent), #34d399);border:none;padding:10px 14px;border-radius:10px;color:#012;cursor:pointer;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .result{font-size:16px;font-weight:700;color:#fff;padding:12px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 6px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03)}
+  .small{font-size:13px;color:var(--muted)}
+  .actions{display:flex;gap:8px;align-items:center}
+  footer{margin-top:18px;color:var(--muted);font-size:13px}
+  @media(max-width:920px){
+    .col-4,.col-3,.col-6,.col-8{grid-column:span 12}
+    header{flex-direction:column;align-items:stretch}
+  }
+#bankSelect,
+#origTerm,
+#redepositTerm {
+  background: rgba(255,255,255,0.03);
+  color: #e6eef6;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+#bankSelect option,
+#origTerm option,
+#redepositTerm option {
+  background: #0b1b2b;
+  color: #e6eef6;
+}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Máy tính Lỗ do rút trước hạn</h1>
+        <div class="small">Dùng bảng lãi suất đã cung cấp. Chọn ngân hàng, nhập dữ liệu, nhấn "Tính" để biết chênh lệch.</div>
+      </div>
+      <div style="margin-left:auto" class="small">Phương pháp: lãi đơn theo ngày (days/365)</div>
+    </header>
+
+    <div class="grid">
+      <!-- Left panel: Inputs -->
+      <div class="card col-4">
+        <label>Chọn ngân hàng</label>
+        <select id="bankSelect"></select>
+
+        <div style="height:10px"></div>
+        <label>Số tiền gửi ban đầu (VND)</label>
+        <input id="principal" type="number" min="0" step="1000000" value="1000000000" />
+
+        <div style="height:10px"></div>
+        <label>Ngày bắt đầu gửi</label>
+        <input id="startDate" type="date" value="2025-09-01" />
+
+        <div style="height:10px"></div>
+        <label>Kỳ hạn gốc (tháng)</label>
+        <select id="origTerm">
+          <option value="0">Không kỳ hạn (0 tháng)</option>
+          <option value="1">1 tháng</option>
+          <option value="3">3 tháng</option>
+          <option value="6">6 tháng</option>
+          <option value="9">9 tháng</option>
+          <option value="12" selected>12 tháng</option>
+        </select>
+
+        <div style="height:10px"></div>
+        <label>Lãi suất kỳ hạn gốc (%/năm)</label>
+        <input id="origRate" type="number" step="0.01" />
+
+        <div style="height:10px"></div>
+        <label>Lãi suất không kỳ hạn (%/năm)</label>
+        <input id="noTermRate" type="number" step="0.01" />
+      </div>
+
+      <!-- Middle: withdrawal -->
+      <div class="card col-4">
+        <label>Số tiền muốn rút (VND)</label>
+        <input id="withdrawAmount" type="number" min="0" step="1000000" value="200000000" />
+
+        <div style="height:10px"></div>
+        <label>Ngày rút</label>
+        <input id="withdrawDate" type="date" value="2025-11-01" />
+
+        <div style="height:10px"></div>
+        <label>Ghi chú</label>
+        <div class="small">Giả định ngân hàng cho phép <b>rút gốc một phần</b>. Phần rút trước sẽ được tính lãi theo lãi suất không kỳ hạn cho đến ngày rút.</div>
+      </div>
+
+      <!-- Right: redeposit -->
+      <div class="card col-4">
+        <label>Ngày gửi lại số tiền vừa rút</label>
+        <input id="redepositDate" type="date" value="2026-01-01" />
+
+        <div style="height:10px"></div>
+        <label>Kỳ hạn gửi lại (tháng)</label>
+        <select id="redepositTerm">
+          <option value="0">Không kỳ hạn (0)</option>
+          <option value="1">1 tháng</option>
+          <option value="3">3 tháng</option>
+          <option value="6">6 tháng</option>
+          <option value="9" selected>9 tháng</option>
+          <option value="12">12 tháng</option>
+        </select>
+
+        <div style="height:10px"></div>
+        <label>Lãi suất gửi lại (%/năm)</label>
+        <input id="redepositRate" type="number" step="0.01" />
+
+        <div style="height:10px"></div>
+        <div class="actions">
+          <button id="calcBtn">Tính</button>
+          <button id="sampleBtn" style="background:linear-gradient(90deg,#7dd3fc,#60a5fa);color:#032">Ví dụ mẫu</button>
+        </div>
+      </div>
+
+      <!-- Rates editor -->
+      <div class="card col-8">
+        <h3 style="margin-top:0">Bảng lãi suất (tự động load theo từng ngân hàng)</h3>
+        <div style="height:8px"></div>
+        <table id="ratesTable" style="width:100%">
+          <thead>
+            <tr><th>Kỳ hạn</th><th>Lãi suất (%/năm)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Không kỳ hạn (0 tháng)</td><td><input class="rateInput" data-term="0" type="number" step="0.01" /></td></tr>
+            <tr><td>1 tháng</td><td><input class="rateInput" data-term="1" type="number" step="0.01" /></td></tr>
+            <tr><td>3 tháng</td><td><input class="rateInput" data-term="3" type="number" step="0.01" /></td></tr>
+            <tr><td>6 tháng</td><td><input class="rateInput" data-term="6" type="number" step="0.01" /></td></tr>
+            <tr><td>9 tháng</td><td><input class="rateInput" data-term="9" type="number" step="0.01" /></td></tr>
+            <tr><td>12 tháng</td><td><input class="rateInput" data-term="12" type="number" step="0.01" /></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Output -->
+      <div class="card col-4">
+        <h3 style="margin-top:0">Kết quả</h3>
+        <div id="output" class="result">Chưa tính — nhập dữ liệu và nhấn <b>Tính</b>.</div>
+        <div style="height:8px"></div>
+        <div class="small">Phương pháp: lãi đơn theo ngày = amount × rate × days/365. So sánh tới ngày đáo hạn gốc.</div>
+      </div>
+
+      <div class="card col-12">
+        <h3 style="margin-top:0">Ghi chú chi tiết</h3>
+        <div id="detail" class="small">Kết quả sẽ hiển thị chi tiết phần lãi từng mốc.</div>
+      </div>
+    </div>
+    <footer>
+      <div>From TranHuyHoang</div>
+  </div>
+
+<script>
+/* ===========================
+   Preset CSV (từ input của bạn)
+   =========================== */
+const csvText = `Bank,No_term,1_month,3_month,6_month,9_month,12_month
+Vietcombank,0.10,1.60,1.90,2.90,2.90,4.60
+VietinBank,0.10,1.60,1.90,3.00,3.00,4.70
+MB Bank,0.05,3.20,3.60,4.20,4.20,4.85
+Agribank,0.20,2.10,2.40,3.50,3.50,4.70
+BIDV,0.10,1.60,1.90,3.00,3.00,4.70
+Techcombank,0.05,3.15,3.45,4.45,4.45,4.65`;
+
+/* Parse CSV into map: bank -> {0:rate,1:rate,3:...,6:...,9:...,12:...} */
+function parseCSVtoMap(csv){
+  const lines = csv.trim().split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+  if(lines.length<2) return {};
+  const header = lines[0].split(',').map(h=>h.trim());
+  const map = {};
+  for(let i=1;i<lines.length;i++){
+    const parts = lines[i].split(',').map(p=>p.trim());
+    const bank = parts[0];
+    map[bank] = {};
+    // header columns mapping
+    for(let j=1;j<header.length && j<parts.length;j++){
+      const head = header[j];
+      const rate = parseFloat(parts[j]);
+      if(head === 'No_term') map[bank][0] = isFinite(rate)?rate:0;
+      else if(head === '1_month') map[bank][1] = isFinite(rate)?rate:0;
+      else if(head === '3_month') map[bank][3] = isFinite(rate)?rate:0;
+      else if(head === '6_month') map[bank][6] = isFinite(rate)?rate:0;
+      else if(head === '9_month') map[bank][9] = isFinite(rate)?rate:0;
+      else if(head === '12_month') map[bank][12] = isFinite(rate)?rate:0;
+      else {
+        // ignore unknown columns
+      }
+    }
+  }
+  return map;
+}
+
+const bankRatesMap = parseCSVtoMap(csvText);
+
+/* Populate bank select */
+const bankSelect = document.getElementById('bankSelect');
+Object.keys(bankRatesMap).forEach(bank=>{
+  const opt = document.createElement('option');
+  opt.value = bank;
+  opt.textContent = bank;
+  bankSelect.appendChild(opt);
+});
+const defaultBank = Object.keys(bankRatesMap)[1] || Object.keys(bankRatesMap)[0];
+bankSelect.value = defaultBank || 'VietinBank';
+
+/* Dom refs */
+const rateInputs = document.querySelectorAll('.rateInput');
+const origRateInput = document.getElementById('origRate');
+const noTermRateInput = document.getElementById('noTermRate');
+const redepositRateInput = document.getElementById('redepositRate');
+const origTermSelect = document.getElementById('origTerm');
+const withdrawAmountInput = document.getElementById('withdrawAmount');
+const withdrawDateInput = document.getElementById('withdrawDate');
+const redepositDateInput = document.getElementById('redepositDate');
+const redepositTermSelect = document.getElementById('redepositTerm');
+const principalInput = document.getElementById('principal');
+const startDateInput = document.getElementById('startDate');
+const calcBtn = document.getElementById('calcBtn');
+const outputDiv = document.getElementById('output');
+const detailDiv = document.getElementById('detail');
+const sampleBtn = document.getElementById('sampleBtn');
+
+/* Utility */
+function fmtMoney(n){
+  if(!isFinite(n)) return '-';
+  return n.toLocaleString('vi-VN', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+function daysBetween(a,b){
+  const msPerDay = 24*3600*1000;
+  return Math.round((b - a)/msPerDay);
+}
+function addMonths(dt, months){
+  const d = new Date(dt.getTime());
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if(d.getDate() !== day){
+    d.setDate(0);
+  }
+  return d;
+}
+
+/* Load rates for selected bank into UI */
+function loadRatesForBank(bank){
+  const rates = bankRatesMap[bank] || {};
+  // fill inputs
+  rateInputs.forEach(inp=>{
+    const term = Number(inp.dataset.term);
+    inp.value = rates[term] !== undefined ? rates[term] : '';
+  });
+  // set origRate and noTermRate and redepositRate based on selected terms
+  const origTerm = Number(origTermSelect.value);
+  origRateInput.value = rates[origTerm] !== undefined ? rates[origTerm] : '';
+  noTermRateInput.value = rates[0] !== undefined ? rates[0] : '';
+  const redepTerm = Number(redepositTermSelect.value);
+  redepositRateInput.value = rates[redepTerm] !== undefined ? rates[redepTerm] : '';
+}
+
+/* When bank changes or term changes, update displayed rates */
+bankSelect.addEventListener('change',()=> {
+  loadRatesForBank(bankSelect.value);
+});
+origTermSelect.addEventListener('change', ()=> {
+  const bank = bankSelect.value;
+  const rates = bankRatesMap[bank] || {};
+  const t = Number(origTermSelect.value);
+  origRateInput.value = rates[t] !== undefined ? rates[t] : '';
+});
+redepositTermSelect.addEventListener('change', ()=> {
+  const bank = bankSelect.value;
+  const rates = bankRatesMap[bank] || {};
+  const t = Number(redepositTermSelect.value);
+  redepositRateInput.value = rates[t] !== undefined ? rates[t] : '';
+});
+
+/* Editable rate inputs -> update the three fields if edited */
+rateInputs.forEach(inp=>{
+  inp.addEventListener('input', ()=>{
+    // if user edits, reflect to origin/redeposit if term matches
+    const term = Number(inp.dataset.term);
+    const bank = bankSelect.value;
+    if(!bankRatesMap[bank]) bankRatesMap[bank] = {};
+    const val = parseFloat(inp.value);
+    if(isFinite(val)) bankRatesMap[bank][term] = val;
+    // sync displayed
+    origRateInput.value = bankRatesMap[bank][Number(origTermSelect.value)] ?? origRateInput.value;
+    noTermRateInput.value = bankRatesMap[bank][0] ?? noTermRateInput.value;
+    redepositRateInput.value = bankRatesMap[bank][Number(redepositTermSelect.value)] ?? redepositRateInput.value;
+  });
+});
+
+/* Initialize defaults */
+loadRatesForBank(bankSelect.value);
+
+/* Sample button populates example from your problem */
+sampleBtn.addEventListener('click', ()=>{
+  // Example: 1,000,000,000 from 1/9/2025, withdraw 200M on 1/11/2025, redeposit 1/1/2026 9-month
+  principalInput.value = 1000000000;
+  startDateInput.value = '2025-09-01';
+  origTermSelect.value = '12';
+  const bank = 'VietinBank';
+  if(bankRatesMap[bank]) bankSelect.value = bank;
+  loadRatesForBank(bankSelect.value);
+  withdrawAmountInput.value = 200000000;
+  withdrawDateInput.value = '2025-11-01';
+  redepositDateInput.value = '2026-01-01';
+  redepositTermSelect.value = '9';
+  // ensure rates displayed
+  origRateInput.value = bankRatesMap[bankSelect.value][12];
+  noTermRateInput.value = bankRatesMap[bankSelect.value][0];
+  redepositRateInput.value = bankRatesMap[bankSelect.value][9];
+  outputDiv.textContent = 'Sẵn sàng — nhấn Tính để xem kết quả ví dụ mẫu.';
+});
+
+/* Core calculation */
+calcBtn.addEventListener('click', ()=>{
+  // Read inputs
+  const principal = Number(principalInput.value) || 0;
+  const startDateStr = startDateInput.value;
+  const origTerm = Number(origTermSelect.value) || 0;
+  const origRate = parseFloat(origRateInput.value)/100 || 0;
+  const noTermRate = parseFloat(noTermRateInput.value)/100 || 0;
+
+  const withdrawAmount = Number(withdrawAmountInput.value) || 0;
+  const withdrawDateStr = withdrawDateInput.value;
+
+  const redepositDateStr = redepositDateInput.value;
+  const redepositTerm = Number(redepositTermSelect.value) || 0;
+  const redepositRate = parseFloat(redepositRateInput.value)/100 || 0;
+
+  // Validate
+  if(!startDateStr || !withdrawDateStr){
+    outputDiv.innerHTML = '<div class="small">Vui lòng nhập <b>Ngày bắt đầu</b> và <b>Ngày rút</b>.</div>';
+    return;
+  }
+  const startDate = new Date(startDateStr + 'T00:00:00');
+  const withdrawDate = new Date(withdrawDateStr + 'T00:00:00');
+  const redepositDate = redepositDateStr ? new Date(redepositDateStr + 'T00:00:00') : null;
+
+  if(withdrawDate < startDate){
+    outputDiv.innerHTML = '<div class="small">Ngày rút phải không nhỏ hơn ngày bắt đầu gửi.</div>';
+    return;
+  }
+  if(withdrawAmount <= 0 || withdrawAmount > principal){
+    outputDiv.innerHTML = '<div class="small">Số tiền rút phải >0 và <= số tiền gửi ban đầu.</div>';
+    return;
+  }
+  if(redepositDate && redepositDate < withdrawDate){
+    outputDiv.innerHTML = '<div class="small">Ngày gửi lại phải không nhỏ hơn ngày rút.</div>';
+    return;
+  }
+
+  // original maturity
+  const origMaturity = addMonths(startDate, origTerm);
+
+  // simple interest helper
+  function simpleInterest(amount, rateAnnual, dateA, dateB){
+    if(!dateA || !dateB) return 0;
+    const d = daysBetween(dateA, dateB);
+    if(d <= 0) return 0;
+    return amount * rateAnnual * (d/365);
+  }
+
+  // Baseline: no withdraw
+  const baselineInterest = simpleInterest(principal, origRate, startDate, origMaturity);
+
+  // Actual when partial withdrawal allowed
+  const remainAmount = principal - withdrawAmount;
+  const remainInterest = simpleInterest(remainAmount, origRate, startDate, origMaturity);
+
+  const withdrawBeforeInterest = simpleInterest(withdrawAmount, noTermRate, startDate, withdrawDate);
+
+  let withdrawAfterInterest = 0;
+  if(redepositDate){
+    const redepositEnd = addMonths(redepositDate, redepositTerm);
+    const periodStart = redepositDate;
+    const periodEnd = (redepositEnd < origMaturity) ? redepositEnd : origMaturity;
+    if(periodEnd > periodStart){
+      withdrawAfterInterest = simpleInterest(withdrawAmount, redepositRate, periodStart, periodEnd);
+    } else {
+      withdrawAfterInterest = 0;
+    }
+  }
+
+  const actualTotalInterest = remainInterest + withdrawBeforeInterest + withdrawAfterInterest;
+  const loss = baselineInterest - actualTotalInterest;
+
+  // Output build
+  const lines = [];
+  lines.push(`<div class="small">Mốc thời gian:</div>`);
+  lines.push(`<div class="small">• Gửi ban đầu: ${startDate.toLocaleDateString()}</div>`);
+  lines.push(`<div class="small">• Kỳ hạn gốc: ${origTerm} tháng → đáo hạn ${origMaturity.toLocaleDateString()}</div>`);
+  lines.push(`<div style="height:8px"></div>`);
+  lines.push(`<table><tbody>`);
+  lines.push(`<tr><th>Chỉ tiêu</th><th style="text-align:right">Số tiền (VND)</th><th style="text-align:right">Lãi (VND)</th></tr>`);
+  lines.push(`<tr><td>1) Nếu không rút — tổng lãi (toàn bộ ${principal.toLocaleString()} hưởng ${(origRate*100).toFixed(2)}%/năm)</td><td style="text-align:right">${fmtMoney(principal)}</td><td style="text-align:right">${fmtMoney(baselineInterest)}</td></tr>`);
+  lines.push(`<tr><td>2) Thực tế — phần còn lại ${remainAmount.toLocaleString()} (vẫn hưởng ${(origRate*100).toFixed(2)}%/năm)</td><td style="text-align:right">${fmtMoney(remainAmount)}</td><td style="text-align:right">${fmtMoney(remainInterest)}</td></tr>`);
+  lines.push(`<tr><td>• Phần rút trước (trước rút: ${startDate.toLocaleDateString()} → ${withdrawDate.toLocaleDateString()}) hưởng không kỳ hạn ${(noTermRate*100).toFixed(2)}%</td><td style="text-align:right">${fmtMoney(withdrawAmount)}</td><td style="text-align:right">${fmtMoney(withdrawBeforeInterest)}</td></tr>`);
+  if(redepositDate){
+    const redepEnd = addMonths(redepositDate, redepositTerm);
+    lines.push(`<tr><td>• Phần rút gửi lại (${redepositDate.toLocaleDateString()} → ${redepEnd.toLocaleDateString()}) hưởng ${(redepositRate*100).toFixed(2)}% — (chỉ tính tới đáo hạn gốc ${origMaturity.toLocaleDateString()})</td><td style="text-align:right">${fmtMoney(withdrawAmount)}</td><td style="text-align:right">${fmtMoney(withdrawAfterInterest)}</td></tr>`);
+  } else {
+    lines.push(`<tr><td>• Phần rút chưa gửi lại (không tính lãi)</td><td style="text-align:right">${fmtMoney(withdrawAmount)}</td><td style="text-align:right">${fmtMoney(0)}</td></tr>`);
+  }
+  lines.push(`<tr><td style="font-weight:700">TỔNG lãi (thực tế) đến ${origMaturity.toLocaleDateString()}</td><td></td><td style="text-align:right;font-weight:700">${fmtMoney(actualTotalInterest)}</td></tr>`);
+  lines.push(`</tbody></table>`);
+
+  lines.push(`<div style="height:8px"></div>`);
+  if(loss >= 0){
+    lines.push(`<div class="result">Bạn bị <span style="color:#ffb86b">lỗ</span> <strong>${fmtMoney(loss)} VND</strong> so với không rút.</div>`);
+  } else {
+    lines.push(`<div class="result">Bạn <span style="color:#60d69c">được lời</span> <strong>${fmtMoney(-loss)} VND</strong> so với không rút.</div>`);
+  }
+
+  lines.push(`<div class="small" style="margin-top:8px">Chi tiết số học (tóm tắt):</div>`);
+  lines.push(`<ul class="small">`);
+  lines.push(`<li>Baseline interest (không rút) = principal × origRate × days(${daysBetween(startDate, origMaturity)}) / 365 = ${fmtMoney(baselineInterest)}</li>`);
+  lines.push(`<li>Actual total interest = remainInterest (${fmtMoney(remainInterest)}) + withdrawBefore (${fmtMoney(withdrawBeforeInterest)}) + withdrawAfter (${fmtMoney(withdrawAfterInterest)}) = ${fmtMoney(actualTotalInterest)}</li>`);
+  lines.push(`</ul>`);
+
+  outputDiv.innerHTML = lines.join('');
+  detailDiv.innerHTML = `<div class="small">Tính dựa trên: origRate=${(origRate*100).toFixed(2)}% | no-term=${(noTermRate*100).toFixed(2)}% | redepositRate=${(redepositRate*100).toFixed(2)}%.</div>`;
+});
+
+/* Initial auto-load */
+loadRatesForBank(bankSelect.value);
+</script>
+</body>
+</html>
